@@ -1,0 +1,20 @@
+{
+ "collapsed (non-IID Adam)": {
+  "rho": 1.1735292673110962,
+  "offset_share_of_IG_mass": 0.6575515568256378,
+  "mean_corr_between_class_maps": 0.8605818344525936,
+  "corr_offset_vs_full_map": 0.9064161572619979
+ },
+ "gauge-normalised": {
+  "rho": 2.0973981662564256e-08,
+  "offset_share_of_IG_mass": 4.862822700069103e-09,
+  "mean_corr_between_class_maps": -0.2697715087482837,
+  "corr_offset_vs_full_map": -0.713553994842354
+ },
+ "healthy (IID)": {
+  "rho": 0.645462691783905,
+  "offset_share_of_IG_mass": 0.4915987414618333,
+  "mean_corr_between_class_maps": 0.38322227724353347,
+  "corr_offset_vs_full_map": 0.07960856227661446
+ }
+}
