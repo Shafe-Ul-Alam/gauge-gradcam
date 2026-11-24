@@ -1,21 +1,23 @@
 """
-camera_ready_experiments.py  --  ICCIT 2026 camera-ready (Paper #1827) reviewer experiments
-==========================================================================================
-All new experiments use the DEDUPLICATED brain-MRI file list (dedup_brain_mri.json,
-built by dedup.py: exact-md5 + near-duplicate (32x32 Pearson r > 0.99) groups collapsed to
-one image; label-conflicting groups dropped).
+camera_ready_experiments.py
 
-Experiments (pick with --exp):
-  table1     R11.1  Table I main rows on the deduplicated split (pretrained ResNet-18)
-  mlphead    R11.4  hidden FC layer before the classifier (Linear-ReLU-Linear head)
-  serveradapt R11.5 FedAdam / FedYogi with server optimiser on parameters only, lr sweep
-  ig         R2.3   Integrated Gradients on collapsed vs corrected vs healthy checkpoints
+Experiments added in the camera-ready revision of "On the Collapse of Grad-CAM under
+Federated Optimization: A Gauge-Theoretic Diagnosis and Correction" (IEEE ICCIT 2026).
 
-Usage (laptop GPU or CPU):
-  python src_imaging/camera_ready_experiments.py --exp table1 --seeds 0 1 2
-  python src_imaging/camera_ready_experiments.py --exp mlphead --seeds 0 1 2
-Results are appended per run to results_imaging/camera_ready/<exp>.jsonl, so an
-interrupted run resumes where it stopped (finished configs are skipped).
+All runs use the deduplicated brain MRI file list (dedup_brain_mri.json, produced by
+dedup.py): exact (md5) and near-duplicate (32x32 Pearson r > 0.99) groups are collapsed to
+one image and label-conflicting groups are dropped.
+
+Experiments (--exp):
+  table1             Table I rows on the deduplicated set (ImageNet-pretrained ResNet-18)
+  mlphead            hidden FC layer before the classifier (Linear-ReLU-Linear head)
+  serveradapt_sweep  FedAdam server learning-rate sweep (15 rounds, one seed)
+  serveradapt        FedAdam / FedYogi with the server step on parameters only (--server_lr)
+  dedup_char         characterisation setting (scratch, 400 images per class)
+
+Usage:
+  python camera_ready_experiments.py --exp table1 --seeds 0 1 2 --data_dir /path/to/brain_mri
+Results are appended per run to <out_dir>/<exp>.jsonl; finished runs are skipped on restart.
 """
 import os, sys, json, copy, time, argparse
 import numpy as np
@@ -25,10 +27,10 @@ from PIL import Image
 import torchvision.transforms as T
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-DATA = os.path.join(ROOT, "data", "brain_mri")
-OUT = os.path.join(ROOT, "results_imaging", "camera_ready")
-CKPT = os.path.join(ROOT, "results_imaging", "model_cache_camera_ready")
+DEDUP_JSON = os.path.join(os.path.dirname(HERE), "dedup_brain_mri.json")
+DATA = os.path.join(HERE, "data", "brain_mri")      # overridden by --data_dir
+OUT = os.path.join(HERE, "results")                 # overridden by --out_dir
+CKPT = os.path.join(HERE, "checkpoints")            # overridden by --ckpt_dir
 DEV = "cuda" if torch.cuda.is_available() else "cpu"
 IMG, BS, N_CLIENTS, LOCAL_EPOCHS = 128, 16, 4, 1
 N_PROBE = 30
@@ -38,7 +40,7 @@ _tf = T.Compose([T.Resize((IMG, IMG)), T.Grayscale(3), T.ToTensor(),
                  T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 def load_dedup(max_per_class=None):
-    meta = json.load(open(os.path.join(HERE, "dedup_brain_mri.json")))
+    meta = json.load(open(DEDUP_JSON))
     classes = meta["classes"]
     by = {c: [] for c in classes}
     for p in meta["kept_paths"]:
@@ -255,7 +257,16 @@ def main():
     ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     ap.add_argument("--server_lr", type=float, default=None, help="for --exp serveradapt")
     ap.add_argument("--threads", type=int, default=0)
+    ap.add_argument("--data_dir", default=None, help="folder with glioma/ meningioma/ notumor/ pituitary/")
+    ap.add_argument("--out_dir", default=None)
+    ap.add_argument("--ckpt_dir", default=None)
+    ap.add_argument("--dedup_json", default=None)
     a = ap.parse_args()
+    global DATA, OUT, CKPT, DEDUP_JSON
+    DATA = a.data_dir or DATA
+    OUT = a.out_dir or OUT
+    CKPT = a.ckpt_dir or CKPT
+    DEDUP_JSON = a.dedup_json or DEDUP_JSON
     if a.threads:
         torch.set_num_threads(a.threads)
     print(f"[device] {DEV}", flush=True)

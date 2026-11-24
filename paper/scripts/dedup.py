@@ -1,6 +1,20 @@
-"""Near-duplicate audit + deduplicated file list for the brain MRI dataset."""
-import os, sys, json, hashlib, numpy as np
+"""
+dedup.py
+
+Near-duplicate audit of the Kaggle Brain Tumor MRI dataset (7,200-image release) and the
+deduplicated file list used in the camera-ready experiments.
+
+Two images are grouped if they are byte-identical (md5) or if their 32x32 grayscale,
+mean-removed versions have Pearson correlation above 0.99. Each group keeps one image (the
+first by file name); groups containing more than one label are dropped entirely.
+
+Usage:
+  python dedup.py /path/to/brain_mri      # writes dedup_brain_mri.json in the working dir
+"""
+import os, sys, json, hashlib
+import numpy as np
 from PIL import Image
+
 root = sys.argv[1] if len(sys.argv) > 1 else "brain_mri"
 THR = 0.99
 classes = sorted(d for d in os.listdir(root) if os.path.isdir(os.path.join(root, d)))
